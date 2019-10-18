@@ -148,12 +148,9 @@ public:
 			throw - 1;
 		}
 
-		// group values by some criterias to write them a few threads
-		// the criterias can be related to the archive name or timestamps or even values count in one package
 		auto groupedValues = _dpGrouppingStratagy->Group(dpValues);
 
-		// perform each group in a separate thread
-		// ...
+		// todo perform each group in a separate thread
 		int idx = 0;
 		int total = dpValues.size();
 		QString sql;
@@ -169,8 +166,8 @@ public:
 				auto dpValue = groupedValues[groupIdx][dpIdx];
 				auto dpDesc = _datapointDescriptionMap[dpValue.Address];
 
-				sql = "INSERT INTO \"" + dpDesc.ArchiveName + "\" (\"Timestamp\", \"" + dpDesc.ValueColumnName + "\", \"" + dpDesc.StatusColumnName + "\") " +
-					+" VALUES (:ts, :value, :status) ON CONFLICT (\"Timestamp\") DO UPDATE SET \"" + dpDesc.ValueColumnName + "\" = :value, \"" + dpDesc.StatusColumnName + "\" = :status";
+				sql = "INSERT INTO \"" + dpDesc.ArchiveName + "\" (\"timestamp\", \"" + dpDesc.ValueColumnName + "\", \"" + dpDesc.StatusColumnName + "\") " +
+					+" VALUES (:ts, :value, :status) ON CONFLICT (\"timestamp\") DO UPDATE SET \"" + dpDesc.ValueColumnName + "\" = :value, \"" + dpDesc.StatusColumnName + "\" = :status";
 
 				//sql = "UPDATE \"" + dpDesc.ArchiveName + "\" SET \"" + dpDesc.ValueColumnName + "\" = :value, " +
 				//	"\"" + dpDesc.StatusColumnName + "\" = :status " +
@@ -185,13 +182,13 @@ public:
 				if (!insertResult)
 				{
 					auto lastError = insertQuery.lastError().text();
-					cout << lastError.toStdString();
+					//cout << lastError.toStdString();
 				}
 
 				idx++;
 			}
 			_db.commit();
-			cout << idx << " / " << total << endl;
+			//cout << idx << " / " << total << endl;
 		}
 	};
 };
@@ -203,9 +200,9 @@ vector<DpDescription> PopulateDemoDpDescriptions(int dpCount)
 	{
 		dps.push_back(DpDescription(
 			"System1.temperature_" + QString::number(i).rightJustified(2, '0'),
-			"values",
-			"P_" + QString::number(i).rightJustified(2, '0'),
-			"S_" + QString::number(i).rightJustified(2, '0')));
+			QString("z_arc%1").arg(i),
+			"p_" + QString::number(1).rightJustified(2, '0'),
+			"s_" + QString::number(1).rightJustified(2, '0')));
 	}
 
 	return dps;
@@ -213,10 +210,10 @@ vector<DpDescription> PopulateDemoDpDescriptions(int dpCount)
 
 int main(void)
 {
-	int demoDpCounts = 100;
-	int demoValuesPerOneDp = 100;
+	int demoDpCounts = 1000;
+	int demoValuesPerOneDp = 10;
 	
-	DpValuesGroupingStrategyByValuesNumber dpValuesGroupingStratagy(1000);
+	DpValuesGroupingStrategyByValuesNumber dpValuesGroupingStratagy(demoValuesPerOneDp);
 	
 	auto dpsDescriptions = PopulateDemoDpDescriptions(demoDpCounts);
 	DbWriter dbWriter(dpsDescriptions, 
@@ -232,7 +229,9 @@ int main(void)
 			auto ts = now;
 			for (size_t valueIdx = 0; valueIdx < demoValuesPerOneDp; valueIdx++)
 			{
-				values.push_back(DpValue(dpsDescriptions[dpIdx].Address, ts, QRandomGenerator::global()->generate(), QRandomGenerator::global()->generate()));
+				values.push_back(DpValue(dpsDescriptions[dpIdx].Address, ts, 
+					QRandomGenerator::global()->generate(), 
+					QRandomGenerator::global()->generate()));
 				ts = ts.addMSecs(1);
 			}
 		}
