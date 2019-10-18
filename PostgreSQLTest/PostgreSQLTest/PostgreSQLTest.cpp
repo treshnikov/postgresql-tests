@@ -159,7 +159,7 @@ public:
 		QString sql;
 		QSqlQuery insertQuery;
 
-		//		PopulateTimestamps(datapointValues, insertQuery);
+		// PopulateTimestamps(datapointValues, insertQuery);
 
 		for (size_t groupIdx = 0; groupIdx < groupedValues.size(); groupIdx++)
 		{
@@ -185,6 +185,7 @@ public:
 				if (!insertResult)
 				{
 					auto lastError = insertQuery.lastError().text();
+					cout << lastError.toStdString();
 				}
 
 				idx++;
