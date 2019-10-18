@@ -125,16 +125,20 @@ private:
 
 	bool TryConnectToDb()
 	{
+		//todo pass params via config or arguments
 		_db.setHostName("localhost");
 		_db.setDatabaseName("winccoa");
 		_db.setUserName("postgres");
 		_db.setPassword("postgres");
+		
+		//todo define connection restore logic in case of loss of connection
 		return _db.open();
 	}
 
 public:
 	DbWriter(const vector<DpDescription>& dpDescription,
 		const shared_ptr<DpValuesGroupingStrategyBase>& dpGrouppingStratagy)
+		: _dpGrouppingStratagy(dpGrouppingStratagy)
 	{
 		for (size_t i = 0; i < dpDescription.size(); i++)
 		{
@@ -142,7 +146,6 @@ public:
 				make_pair(dpDescription[i].Address,
 					dpDescription[i]));
 		}
-		_dpGrouppingStratagy = dpGrouppingStratagy;
 	};
 
 	void Write(const vector<DpValue>& dpValues)
@@ -155,12 +158,12 @@ public:
 
 		auto groupedValues = _dpGrouppingStratagy->Group(dpValues);
 
-		// todo perform each group in a separate thread
 		int idx = 0;
 		int total = dpValues.size();
 		QString sql;
 		QSqlQuery insertQuery;
 
+		// todo perform each group in a separate thread
 		for (size_t groupIdx = 0; groupIdx < groupedValues.size(); groupIdx++)
 		{
 			_db.transaction();
