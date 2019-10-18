@@ -11,7 +11,7 @@
 
 using namespace std;
 
-class DatapointValue
+class DpValue
 {
 public:
 	QString Address;
@@ -19,13 +19,13 @@ public:
 	float Value;
 	float Status;
 
-	DatapointValue(const QString& address, const QDateTime& timestamp, float value, float status)
+	DpValue(const QString& address, const QDateTime& timestamp, float value, float status)
 		:Address(address), Timestamp(timestamp), Value(value), Status(status)
 	{
 	}
 };
 
-class DatapointDescription
+class DpDescription
 {
 public:
 	QString Address;
@@ -33,9 +33,9 @@ public:
 	QString ValueColumnName;
 	QString StatusColumnName;
 
-	DatapointDescription() {}
+	DpDescription() {}
 
-	DatapointDescription(const QString& address, const QString& archiveName, const QString& valueColumnName, const QString& statusColumnName)
+	DpDescription(const QString& address, const QString& archiveName, const QString& valueColumnName, const QString& statusColumnName)
 		:Address(address), ArchiveName(archiveName), ValueColumnName(valueColumnName), StatusColumnName(statusColumnName)
 	{
 	}
@@ -46,24 +46,24 @@ public:
 	}
 };
 
-class DatapointValuesGrouppingStrategyBase
+class DpValuesGroupingStrategyBase
 {
 public:
-	virtual vector<vector<DatapointValue>> Group(const vector<DatapointValue>& args) = 0;
+	virtual vector<vector<DpValue>> Group(const vector<DpValue>& args) = 0;
 };
 
-class DatapointValuesGrouppingStrategyByValuesNumber : public DatapointValuesGrouppingStrategyBase
+class DpValuesGroupingStrategyByValuesNumber : public DpValuesGroupingStrategyBase
 {
 private:
 	int _packageSize;
 public:
-	DatapointValuesGrouppingStrategyByValuesNumber(int packageSize) : _packageSize(packageSize) {
+	DpValuesGroupingStrategyByValuesNumber(int packageSize) : _packageSize(packageSize) {
 	}
 
-	vector<vector<DatapointValue>> Group(const vector<DatapointValue>& args)
+	vector<vector<DpValue>> Group(const vector<DpValue>& args)
 	{
-		vector<vector<DatapointValue>> result;
-		vector<DatapointValue> currentPackage;
+		vector<vector<DpValue>> result;
+		vector<DpValue> currentPackage;
 
 		for (size_t i = 0; i < args.size(); i++)
 		{
@@ -89,8 +89,8 @@ public:
 class DbWriter
 {
 private:
-	map<QString, DatapointDescription> _datapointDescriptionMap;
-	shared_ptr<DatapointValuesGrouppingStrategyBase> _dpGrouppingStratagy;
+	map<QString, DpDescription> _datapointDescriptionMap;
+	shared_ptr<DpValuesGroupingStrategyBase> _dpGrouppingStratagy;
 	QSqlDatabase _db = QSqlDatabase::addDatabase("QPSQL");
 
 	bool TryConnectToDb()
@@ -102,45 +102,45 @@ private:
 		return _db.open();
 	}
 
-	void PopulateTimestamps(const std::vector<DatapointValue>& datapointValues, QSqlQuery& insertQuery)
+	void PopulateTimestamps(const std::vector<DpValue>& dpValues, QSqlQuery& query)
 	{
 		QString sql;
 		vector<QDateTime> dts;
-		for (size_t i = 0; i < datapointValues.size(); i++)
+		for (size_t i = 0; i < dpValues.size(); i++)
 		{
-			if (find(dts.begin(), dts.end(), datapointValues[i].Timestamp) == dts.end())
+			if (find(dts.begin(), dts.end(), dpValues[i].Timestamp) == dts.end())
 			{
-				dts.push_back(datapointValues[i].Timestamp);
+				dts.push_back(dpValues[i].Timestamp);
 			}
 		}
 		_db.transaction();
 		for (size_t i = 0; i < dts.size(); i++)
 		{
 			sql = "INSERT INTO \"values\" (\"Timestamp\") VALUES (:ts) ON CONFLICT DO NOTHING";
-			insertQuery.bindValue(":ts", dts[i]);
-			auto insertResult = insertQuery.exec();
+			query.bindValue(":ts", dts[i]);
+			auto insertResult = query.exec();
 			if (!insertResult)
 			{
-				auto lastError = insertQuery.lastError().text();
+				auto lastError = query.lastError().text();
 			}
 		}
 		_db.commit();
 	}
 
 public:
-	DbWriter(const vector<DatapointDescription>& datapointDescription,
-		const shared_ptr<DatapointValuesGrouppingStrategyBase>& dpGrouppingStratagy)
+	DbWriter(const vector<DpDescription>& dpDescription,
+		const shared_ptr<DpValuesGroupingStrategyBase>& dpGrouppingStratagy)
 	{
-		for (size_t i = 0; i < datapointDescription.size(); i++)
+		for (size_t i = 0; i < dpDescription.size(); i++)
 		{
 			_datapointDescriptionMap.insert(
-				make_pair(datapointDescription[i].Address,
-					datapointDescription[i]));
+				make_pair(dpDescription[i].Address,
+					dpDescription[i]));
 		}
 		_dpGrouppingStratagy = dpGrouppingStratagy;
 	};
 
-	void Write(const vector<DatapointValue>& datapointValues)
+	void Write(const vector<DpValue>& dpValues)
 	{
 		if (!TryConnectToDb())
 		{
@@ -150,12 +150,12 @@ public:
 
 		// group values by some criterias to write them a few threads
 		// the criterias can be related to the archive name or timestamps or even values count in one package
-		auto groupedValues = _dpGrouppingStratagy->Group(datapointValues);
+		auto groupedValues = _dpGrouppingStratagy->Group(dpValues);
 
 		// perform each group in a separate thread
 		// ...
 		int idx = 0;
-		int total = datapointValues.size();
+		int total = dpValues.size();
 		QString sql;
 		QSqlQuery insertQuery;
 
@@ -199,13 +199,13 @@ int main(void)
 {
 	int demoDpCounts = 100;
 	int demoValuesPerOneDp = 100;
-	DatapointValuesGrouppingStrategyByValuesNumber dpValuesGroupingStratagy(1000);
+	DpValuesGroupingStrategyByValuesNumber dpValuesGroupingStratagy(1000);
 
 	// preparing datapoints description for testing
-	vector<DatapointDescription> dps;
+	vector<DpDescription> dps;
 	for (size_t i = 1; i <= demoDpCounts; i++)
 	{
-		dps.push_back(DatapointDescription(
+		dps.push_back(DpDescription(
 			"System1.temperature_" + QString::number(i).rightJustified(2, '0'),
 			"values",
 			"P_" + QString::number(i).rightJustified(2, '0'),
@@ -213,20 +213,20 @@ int main(void)
 	}
 
 	// init a new DbWriter instsnce
-	DbWriter dbWriter(dps, make_shared<DatapointValuesGrouppingStrategyByValuesNumber>(dpValuesGroupingStratagy));
+	DbWriter dbWriter(dps, make_shared<DpValuesGroupingStrategyByValuesNumber>(dpValuesGroupingStratagy));
 
 	while (true)
 	{
 
 		// generate demo dp values - 10 000 values for each datapoint
-		vector<DatapointValue> values;
+		vector<DpValue> values;
 		auto now = QDateTime::currentDateTime();
 		for (size_t dpIdx = 0; dpIdx < dps.size(); dpIdx++)
 		{
 			auto ts = now;
 			for (size_t valueIdx = 0; valueIdx < demoValuesPerOneDp; valueIdx++)
 			{
-				values.push_back(DatapointValue(dps[dpIdx].Address, ts, QRandomGenerator::global()->generate(), QRandomGenerator::global()->generate()));
+				values.push_back(DpValue(dps[dpIdx].Address, ts, QRandomGenerator::global()->generate(), QRandomGenerator::global()->generate()));
 				ts = ts.addMSecs(1);
 			}
 		}
