@@ -214,8 +214,6 @@ public:
 		for (size_t groupIdx = 0; groupIdx < groupedValues.size(); groupIdx++)
 		{
 			DpValuesPackage& group = groupedValues[groupIdx];
-			//WritePackage(group, groupIdx);
-			
 			threadPool.push_back(thread(&DbWriter::WritePackage, this, ref(group)));
 		}
 
@@ -245,7 +243,7 @@ vector<DpDescription> PopulateDemoDpDescriptions(int dpCount)
 int main(void)
 {
 	int demoDpCounts = 1;
-	int demoValuesPerOneDp = 1500;
+	int demoValuesPerOneDp = 5000;
 	auto dpsDescriptions = PopulateDemoDpDescriptions(demoDpCounts);
 
 	DpValuesGroupingStrategyByTablesAndPackages dpValuesGroupingStratagy(demoValuesPerOneDp, dpsDescriptions);
@@ -254,14 +252,13 @@ int main(void)
 		dpsDescriptions, 
 		make_shared<DpValuesGroupingStrategyByTablesAndPackages>(dpValuesGroupingStratagy));
 
+	auto modelTime = QDateTime::currentDateTime();
 	while (true)
 	{
-		// generate demo dp values
 		vector<DpValue> values;
-		auto now = QDateTime::currentDateTime();
 		for (size_t dpIdx = 0; dpIdx < dpsDescriptions.size(); dpIdx++)
 		{
-			auto ts = now;
+			auto ts = modelTime;
 			for (size_t valueIdx = 0; valueIdx < demoValuesPerOneDp; valueIdx++)
 			{
 				values.push_back(
@@ -272,6 +269,7 @@ int main(void)
 				ts = ts.addMSecs(1);
 			}
 		}
+		modelTime = modelTime.addMSecs(demoValuesPerOneDp + 1);
 
 		auto startTime = QDateTime::currentDateTime();
 		dbWriter.Write(values);
