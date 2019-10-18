@@ -166,13 +166,13 @@ public:
 		// todo perform each group in a separate thread
 		for (size_t groupIdx = 0; groupIdx < groupedValues.size(); groupIdx++)
 		{
+			DpValuesPackage& group = groupedValues[groupIdx];
 			_db.transaction();
-			for (size_t dpIdx = 0; dpIdx < groupedValues[groupIdx].Values.size(); dpIdx++)
+			for (size_t dpIdx = 0; dpIdx < group.Values.size(); dpIdx++)
 			{
-				auto dpValue = groupedValues[groupIdx].Values[dpIdx];
-				auto dpDesc = _datapointDescriptionMap[dpValue.Address];
 
-				sql = "INSERT INTO \"" + dpDesc.ArchiveName + "\" (\"timestamp\", \"p_01\", \"s_01\") " +
+				DpValue& dpValue = group.Values[dpIdx];
+				sql = "INSERT INTO \"" + group.ArchiveTableName + "\" (\"timestamp\", \"p_01\", \"s_01\") " +
 					+ " VALUES (:ts, :value, :status)";
 					//ON CONFLICT (\"timestamp\") DO UPDATE SET \"p_01\" = :value, \"s_01\" = :status
 
