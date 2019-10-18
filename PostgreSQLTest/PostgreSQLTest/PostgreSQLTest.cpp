@@ -195,15 +195,10 @@ public:
 	};
 };
 
-int main(void)
+vector<DpDescription> PopulateDemoDpDescriptions(int dpCount)
 {
-	int demoDpCounts = 100;
-	int demoValuesPerOneDp = 100;
-	DpValuesGroupingStrategyByValuesNumber dpValuesGroupingStratagy(1000);
-
-	// preparing datapoints description for testing
 	vector<DpDescription> dps;
-	for (size_t i = 1; i <= demoDpCounts; i++)
+	for (size_t i = 1; i <= dpCount; i++)
 	{
 		dps.push_back(DpDescription(
 			"System1.temperature_" + QString::number(i).rightJustified(2, '0'),
@@ -212,21 +207,31 @@ int main(void)
 			"S_" + QString::number(i).rightJustified(2, '0')));
 	}
 
-	// init a new DbWriter instsnce
-	DbWriter dbWriter(dps, make_shared<DpValuesGroupingStrategyByValuesNumber>(dpValuesGroupingStratagy));
+	return dps;
+}
+
+int main(void)
+{
+	int demoDpCounts = 100;
+	int demoValuesPerOneDp = 100;
+	
+	DpValuesGroupingStrategyByValuesNumber dpValuesGroupingStratagy(1000);
+	
+	auto dpsDescriptions = PopulateDemoDpDescriptions(demoDpCounts);
+	DbWriter dbWriter(dpsDescriptions, 
+					  make_shared<DpValuesGroupingStrategyByValuesNumber>(dpValuesGroupingStratagy));
 
 	while (true)
 	{
-
-		// generate demo dp values - 10 000 values for each datapoint
+		// generate demo dp values
 		vector<DpValue> values;
 		auto now = QDateTime::currentDateTime();
-		for (size_t dpIdx = 0; dpIdx < dps.size(); dpIdx++)
+		for (size_t dpIdx = 0; dpIdx < dpsDescriptions.size(); dpIdx++)
 		{
 			auto ts = now;
 			for (size_t valueIdx = 0; valueIdx < demoValuesPerOneDp; valueIdx++)
 			{
-				values.push_back(DpValue(dps[dpIdx].Address, ts, QRandomGenerator::global()->generate(), QRandomGenerator::global()->generate()));
+				values.push_back(DpValue(dpsDescriptions[dpIdx].Address, ts, QRandomGenerator::global()->generate(), QRandomGenerator::global()->generate()));
 				ts = ts.addMSecs(1);
 			}
 		}
@@ -234,7 +239,6 @@ int main(void)
 		auto startTime = QDateTime::currentDateTime();
 		dbWriter.Write(values);
 		auto durationMs = now.msecsTo(QDateTime::currentDateTime());
-		cout << durationMs << " ms" << endl;
 		cout << (1000 * demoDpCounts * demoValuesPerOneDp) / durationMs << " param per sec" << endl;
 	}
 	system("pause");
