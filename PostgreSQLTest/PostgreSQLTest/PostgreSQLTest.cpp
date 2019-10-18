@@ -131,17 +131,10 @@ private:
 	//	//todo pass params via config or arguments
 	//	_db.setHostName("localhost");
 	//	_db.setDatabaseName("winccoa");
-	//	_db.setUserName("postgres");
-	//	_db.setPassword("postgres");
-	//	
-	//	//todo define connection restore logic in case of loss of connection
-	//	return _db.open();
-	//}
-
-	QSqlDatabase& AccuireConnection(int connectionIdx)
+	QSqlDatabase& AcquireConnection()
 	{
 		auto maxConnections = 5;
-		auto connectionNumber = connectionIdx % maxConnections;
+		auto connectionNumber = 0;
 
 		if (dbPool.size() <= connectionNumber)
 		{
@@ -178,9 +171,9 @@ public:
 		}
 	};
 
-	void WritePackage(DpValuesPackage& group, int connectionNumber)
+	void WritePackage(DpValuesPackage& group)
 	{
-		QSqlDatabase& db = AccuireConnection(connectionNumber);
+		QSqlDatabase& db = AcquireConnection();
 		QString sql;
 		QSqlQuery query(db);
 
@@ -220,14 +213,18 @@ public:
 
 		for (size_t groupIdx = 0; groupIdx < groupedValues.size(); groupIdx++)
 		{
-			WritePackage(groupedValues[groupIdx], groupIdx);
-			//threadPool.push_back(thread());
+			DpValuesPackage& group = groupedValues[groupIdx];
+			//WritePackage(group, groupIdx);
+			
+			threadPool.push_back(thread(&DbWriter::WritePackage, this, ref(group)));
 		}
 
-		//for (auto& th : threadPool)
-		//{
-		//	//th.join();
-		//}
+		for (auto& th : threadPool)
+		{
+			th.join();
+		}
+
+		threadPool.clear();
 
 	};
 };
@@ -247,8 +244,8 @@ vector<DpDescription> PopulateDemoDpDescriptions(int dpCount)
 
 int main(void)
 {
-	int demoDpCounts = 100;
-	int demoValuesPerOneDp = 100;
+	int demoDpCounts = 1;
+	int demoValuesPerOneDp = 1500;
 	auto dpsDescriptions = PopulateDemoDpDescriptions(demoDpCounts);
 
 	DpValuesGroupingStrategyByTablesAndPackages dpValuesGroupingStratagy(demoValuesPerOneDp, dpsDescriptions);
