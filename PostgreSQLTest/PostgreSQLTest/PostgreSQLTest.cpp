@@ -25,6 +25,21 @@ public:
 	}
 };
 
+class DpValuesPackage
+{
+public:
+	QString ArchiveTableName;
+	vector<DpValue> Values;
+
+	DpValuesPackage(QString archiveTableName, vector<DpValue>& values)
+		: ArchiveTableName(archiveTableName), Values(values)
+	{}
+
+	DpValuesPackage(QString archiveTableName)
+		: ArchiveTableName(archiveTableName)
+	{}
+};
+
 class DpDescription
 {
 public:
@@ -47,41 +62,58 @@ public:
 class DpValuesGroupingStrategyBase
 {
 public:
-	virtual vector<vector<DpValue>> Group(const vector<DpValue>& args) = 0;
+	virtual vector<DpValuesPackage> Group(const vector<DpValue>& args) = 0;
 };
 
-class DpValuesGroupingStrategyByValuesNumber : public DpValuesGroupingStrategyBase
+class DpValuesGroupingStrategyByTablesAndPackages : public DpValuesGroupingStrategyBase
 {
 private:
 	int _packageSize;
+	map<QString, DpDescription> dpAddressToDpDescription;
 public:
-	DpValuesGroupingStrategyByValuesNumber(int packageSize) : _packageSize(packageSize) {
-	}
-
-	vector<vector<DpValue>> Group(const vector<DpValue>& args)
+	DpValuesGroupingStrategyByTablesAndPackages(int packageSize, const vector<DpDescription>& dpDescription) 
+		: _packageSize(packageSize) 
 	{
-		vector<vector<DpValue>> result;
-		vector<DpValue> currentPackage;
-
-		for (size_t i = 0; i < args.size(); i++)
+		for (size_t i = 0; i < dpDescription.size(); i++)
 		{
-			currentPackage.push_back(args[i]);
-
-			if ((i + 1) % _packageSize == 0)
-			{
-				result.push_back(currentPackage);
-				currentPackage.clear();
-			}
+			dpAddressToDpDescription.insert(
+				make_pair(dpDescription[i].Address,
+					dpDescription[i]));
 		}
 
-		if (currentPackage.size() > 0)
+	}
+
+	vector<DpValuesPackage> Group(const vector<DpValue>& args)
+	{
+		map<QString, vector<DpValue>> arcTableNameToDpValues;
+
+		// group dpValues by archive table name
+		for (size_t i = 0; i < args.size(); i++)
 		{
+			auto tableName = dpAddressToDpDescription[args[i].Address].ArchiveName;
+			if (arcTableNameToDpValues.find(tableName) == arcTableNameToDpValues.end())
+			{
+				arcTableNameToDpValues[tableName] = vector<DpValue>();
+			}
+
+			arcTableNameToDpValues[tableName].push_back(args[i]);
+		}
+
+		vector<DpValuesPackage> result;
+		for (auto iter = arcTableNameToDpValues.begin(); iter != arcTableNameToDpValues.end(); ++iter)
+		{
+			auto tableName = iter->first;
+			DpValuesPackage currentPackage(tableName);
+
+			for (size_t i = 0; i < arcTableNameToDpValues[tableName].size(); i++)
+			{
+				currentPackage.Values.push_back(arcTableNameToDpValues[tableName][i]);
+			}
 			result.push_back(currentPackage);
 		}
 
 		return result;
 	};
-
 };
 
 class DbWriter
@@ -129,19 +161,17 @@ public:
 		QString sql;
 		QSqlQuery insertQuery;
 
-		// PopulateTimestamps(datapointValues, insertQuery);
-
 		for (size_t groupIdx = 0; groupIdx < groupedValues.size(); groupIdx++)
 		{
 			_db.transaction();
-			for (size_t dpIdx = 0; dpIdx < groupedValues[groupIdx].size(); dpIdx++)
+			for (size_t dpIdx = 0; dpIdx < groupedValues[groupIdx].Values.size(); dpIdx++)
 			{
-				auto dpValue = groupedValues[groupIdx][dpIdx];
+				auto dpValue = groupedValues[groupIdx].Values[dpIdx];
 				auto dpDesc = _datapointDescriptionMap[dpValue.Address];
 
 				sql = "INSERT INTO \"" + dpDesc.ArchiveName + "\" (\"timestamp\", \"p_01\", \"s_01\") " +
-					+" VALUES (:ts, :value, :status)";
-				//ON CONFLICT (\"timestamp\") DO UPDATE SET \"p_01\" = :value, \"s_01\" = :status
+					+ " VALUES (:ts, :value, :status)";
+					//ON CONFLICT (\"timestamp\") DO UPDATE SET \"p_01\" = :value, \"s_01\" = :status
 
 				insertQuery.prepare(sql);
 				insertQuery.bindValue(":ts", dpValue.Timestamp);
@@ -180,12 +210,12 @@ int main(void)
 {
 	int demoDpCounts = 100;
 	int demoValuesPerOneDp = 100;
-	
-	DpValuesGroupingStrategyByValuesNumber dpValuesGroupingStratagy(demoValuesPerOneDp);
-	
 	auto dpsDescriptions = PopulateDemoDpDescriptions(demoDpCounts);
+
+	DpValuesGroupingStrategyByTablesAndPackages dpValuesGroupingStratagy(demoValuesPerOneDp, dpsDescriptions);
+	
 	DbWriter dbWriter(dpsDescriptions, 
-					  make_shared<DpValuesGroupingStrategyByValuesNumber>(dpValuesGroupingStratagy));
+					  make_shared<DpValuesGroupingStrategyByTablesAndPackages>(dpValuesGroupingStratagy));
 
 	while (true)
 	{
