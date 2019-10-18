@@ -122,26 +122,16 @@ class DbWriter
 private:
 	map<QString, DpDescription> _datapointDescriptionMap;
 	shared_ptr<DpValuesGroupingStrategyBase> _dpGrouppingStratagy;
-	//QSqlDatabase _db = QSqlDatabase::addDatabase("QPSQL");
 	vector<thread> threadPool;
 	vector<QSqlDatabase> dbPool;
 
 	//bool TryConnectToDb()
 	//{
-	//	//todo pass params via config or arguments
-	//	_db.setHostName("localhost");
-	//	_db.setDatabaseName("winccoa");
-	QSqlDatabase& AcquireConnection()
+	void PopulateDbConnections()
 	{
-		auto maxConnections = 5;
-		auto connectionNumber = 0;
-
-		if (dbPool.size() <= connectionNumber)
+		for (size_t i = 0; i < _threadCount; i++)
 		{
-			//std::hash<std::thread::id> hasher;
-			//auto connectionName = QString::number(hasher(this_thread::get_id()));
-
-			QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL", QString::number(connectionNumber));
+			QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL", QString::number(i));
 			db.setHostName("localhost");
 			db.setDatabaseName("winccoa");
 			db.setUserName("postgres");
@@ -154,14 +144,13 @@ private:
 
 			dbPool.push_back(db);
 		}
-
-		return dbPool[connectionNumber];
 	}
 
 public:
 	DbWriter(const vector<DpDescription>& dpDescription,
-		const shared_ptr<DpValuesGroupingStrategyBase>& dpGrouppingStratagy)
-		: _dpGrouppingStratagy(dpGrouppingStratagy)
+		const shared_ptr<DpValuesGroupingStrategyBase>& dpGrouppingStratagy,
+		int threadCount)
+		: _dpGrouppingStratagy(dpGrouppingStratagy), _threadCount(threadCount)
 	{
 		for (size_t i = 0; i < dpDescription.size(); i++)
 		{
@@ -169,11 +158,12 @@ public:
 				make_pair(dpDescription[i].Address,
 					dpDescription[i]));
 		}
+
+		PopulateDbConnections();
 	};
 
-	void WritePackage(DpValuesPackage& group)
+	void WritePackage(DpValuesPackage& group, QSqlDatabase& db)
 	{
-		QSqlDatabase& db = AcquireConnection();
 		QString sql;
 		QSqlQuery query(db);
 
@@ -209,21 +199,33 @@ public:
 
 	void Write(const vector<DpValue>& dpValues)
 	{
+		vector<thread> threadPool;
 		auto groupedValues = _dpGrouppingStratagy->Group(dpValues);
 
 		for (size_t groupIdx = 0; groupIdx < groupedValues.size(); groupIdx++)
 		{
 			DpValuesPackage& group = groupedValues[groupIdx];
-			threadPool.push_back(thread(&DbWriter::WritePackage, this, ref(group)));
+			
+			int poolIdx = groupIdx % _threadCount;
+			QSqlDatabase& db = dbPool[poolIdx];
+			
+			threadPool.push_back(thread(&DbWriter::WritePackage, this, ref(group), ref(db)));
+
+			if (poolIdx == _threadCount - 1)
+			{
+				for (auto& th : threadPool)
+				{
+					th.join();
+				}
+				threadPool.clear();
+			}
 		}
 
 		for (auto& th : threadPool)
 		{
 			th.join();
 		}
-
 		threadPool.clear();
-
 	};
 };
 
@@ -242,15 +244,16 @@ vector<DpDescription> PopulateDemoDpDescriptions(int dpCount)
 
 int main(void)
 {
-	int demoDpCounts = 1;
-	int demoValuesPerOneDp = 5000;
+	int demoDpCounts = 100;
+	int demoValuesPerOneDp = 100;
 	auto dpsDescriptions = PopulateDemoDpDescriptions(demoDpCounts);
 
 	DpValuesGroupingStrategyByTablesAndPackages dpValuesGroupingStratagy(demoValuesPerOneDp, dpsDescriptions);
 	
 	DbWriter dbWriter(
 		dpsDescriptions, 
-		make_shared<DpValuesGroupingStrategyByTablesAndPackages>(dpValuesGroupingStratagy));
+		make_shared<DpValuesGroupingStrategyByTablesAndPackages>(dpValuesGroupingStratagy),
+		5);
 
 	auto modelTime = QDateTime::currentDateTime();
 	while (true)
