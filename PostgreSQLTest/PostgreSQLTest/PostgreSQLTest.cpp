@@ -158,40 +158,40 @@ public:
 
 		auto groupedValues = _dpGrouppingStratagy->Group(dpValues);
 
-		int idx = 0;
-		int total = dpValues.size();
 		QString sql;
-		QSqlQuery insertQuery;
+		QSqlQuery query;
 
 		// todo perform each group in a separate thread
 		for (size_t groupIdx = 0; groupIdx < groupedValues.size(); groupIdx++)
 		{
 			DpValuesPackage& group = groupedValues[groupIdx];
+
+			QVariantList tss;
+			QVariantList values;
+			QVariantList statuses;
+
 			_db.transaction();
 			for (size_t dpIdx = 0; dpIdx < group.Values.size(); dpIdx++)
 			{
-
 				DpValue& dpValue = group.Values[dpIdx];
-				sql = "INSERT INTO \"" + group.ArchiveTableName + "\" (\"timestamp\", \"p_01\", \"s_01\") " +
-					+ " VALUES (:ts, :value, :status)";
-					//ON CONFLICT (\"timestamp\") DO UPDATE SET \"p_01\" = :value, \"s_01\" = :status
-
-				insertQuery.prepare(sql);
-				insertQuery.bindValue(":ts", dpValue.Timestamp);
-				insertQuery.bindValue(":value", dpValue.Value);
-				insertQuery.bindValue(":status", dpValue.Status);
-
-				auto insertResult = insertQuery.exec();
-				if (!insertResult)
-				{
-					auto lastError = insertQuery.lastError().text();
-					//cout << lastError.toStdString();
-				}
-
-				idx++;
+				tss.push_back(dpValue.Timestamp);
+				values.push_back(dpValue.Value);
+				statuses.push_back(dpValue.Status);
 			}
+
+			sql = "INSERT INTO \"" + group.ArchiveTableName + "\" (\"timestamp\", \"p_01\", \"s_01\") VALUES (?, ?, ?)"; 			//ON CONFLICT (\"timestamp\") DO UPDATE SET \"p_01\" = :value, \"s_01\" = :status
+			query.prepare(sql);
+			query.addBindValue(tss);
+			query.addBindValue(values);
+			query.addBindValue(statuses);
+
+			auto insertResult = query.execBatch();
+			if (!insertResult)
+			{
+				auto lastError = query.lastError().text();
+			}
+
 			_db.commit();
-			//cout << idx << " / " << total << endl;
 		}
 	};
 };
@@ -212,14 +212,13 @@ vector<DpDescription> PopulateDemoDpDescriptions(int dpCount)
 int main(void)
 {
 	int demoDpCounts = 100;
-	int demoValuesPerOneDp = 100;
+	int demoValuesPerOneDp = 500;
 	auto dpsDescriptions = PopulateDemoDpDescriptions(demoDpCounts);
 
 	DpValuesGroupingStrategyByTablesAndPackages dpValuesGroupingStratagy(demoValuesPerOneDp, dpsDescriptions);
 	
 	DbWriter dbWriter(dpsDescriptions, 
 					  make_shared<DpValuesGroupingStrategyByTablesAndPackages>(dpValuesGroupingStratagy));
-
 	while (true)
 	{
 		// generate demo dp values
@@ -230,16 +229,18 @@ int main(void)
 			auto ts = now;
 			for (size_t valueIdx = 0; valueIdx < demoValuesPerOneDp; valueIdx++)
 			{
-				values.push_back(DpValue(dpsDescriptions[dpIdx].Address, ts, 
-					QRandomGenerator::global()->generate(), 
-					QRandomGenerator::global()->generate()));
+				values.push_back(
+					DpValue(dpsDescriptions[dpIdx].Address,
+						ts,
+						QRandomGenerator::global()->generate(),
+						QRandomGenerator::global()->generate()));
 				ts = ts.addMSecs(1);
 			}
 		}
 
 		auto startTime = QDateTime::currentDateTime();
 		dbWriter.Write(values);
-		auto durationMs = now.msecsTo(QDateTime::currentDateTime());
+		auto durationMs = startTime.msecsTo(QDateTime::currentDateTime());
 		cout << (1000 * demoDpCounts * demoValuesPerOneDp) / durationMs << " param per sec" << endl;
 	}
 	system("pause");
