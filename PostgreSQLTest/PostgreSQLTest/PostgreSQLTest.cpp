@@ -108,9 +108,19 @@ public:
 
 			for (size_t i = 0; i < arcTableNameToDpValues[tableName].size(); i++)
 			{
+				if (i != 0 && i % _packageSize == 0)
+				{
+					result.push_back(currentPackage);
+					currentPackage.Values.clear();
+				}
+
 				currentPackage.Values.push_back(arcTableNameToDpValues[tableName][i]);
 			}
-			result.push_back(currentPackage);
+
+			if (currentPackage.Values.size() != 0)
+			{
+				result.push_back(currentPackage);
+			}
 		}
 
 		return result;
@@ -120,16 +130,14 @@ public:
 class DbWriter
 {
 private:
+	int _threadsCount;
 	map<QString, DpDescription> _datapointDescriptionMap;
 	shared_ptr<DpValuesGroupingStrategyBase> _dpGrouppingStratagy;
-	vector<thread> threadPool;
 	vector<QSqlDatabase> dbPool;
 
-	//bool TryConnectToDb()
-	//{
 	void PopulateDbConnections()
 	{
-		for (size_t i = 0; i < _threadCount; i++)
+		for (size_t i = 0; i < _threadsCount; i++)
 		{
 			QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL", QString::number(i));
 			db.setHostName("localhost");
@@ -149,8 +157,8 @@ private:
 public:
 	DbWriter(const vector<DpDescription>& dpDescription,
 		const shared_ptr<DpValuesGroupingStrategyBase>& dpGrouppingStratagy,
-		int threadCount)
-		: _dpGrouppingStratagy(dpGrouppingStratagy), _threadCount(threadCount)
+		int threadsCount)
+		: _dpGrouppingStratagy(dpGrouppingStratagy), _threadsCount(threadsCount)
 	{
 		for (size_t i = 0; i < dpDescription.size(); i++)
 		{
@@ -206,12 +214,12 @@ public:
 		{
 			DpValuesPackage& group = groupedValues[groupIdx];
 			
-			int poolIdx = groupIdx % _threadCount;
+			int poolIdx = groupIdx % _threadsCount;
 			QSqlDatabase& db = dbPool[poolIdx];
 			
 			threadPool.push_back(thread(&DbWriter::WritePackage, this, ref(group), ref(db)));
 
-			if (poolIdx == _threadCount - 1)
+			if (poolIdx == _threadsCount - 1)
 			{
 				for (auto& th : threadPool)
 				{
@@ -244,16 +252,18 @@ vector<DpDescription> PopulateDemoDpDescriptions(int dpCount)
 
 int main(void)
 {
-	int demoDpCounts = 100;
-	int demoValuesPerOneDp = 100;
-	auto dpsDescriptions = PopulateDemoDpDescriptions(demoDpCounts);
+	int dpCounts = 20;
+	int dpValuesForOneDp = 1000;
+	int dpValuesInOneDbTransaction = 1000;
+	int dbWriteThreads = 7;
 
-	DpValuesGroupingStrategyByTablesAndPackages dpValuesGroupingStratagy(demoValuesPerOneDp, dpsDescriptions);
+	auto dpsDescriptions = PopulateDemoDpDescriptions(dpCounts);
+	DpValuesGroupingStrategyByTablesAndPackages dpValuesGroupingStratagy(dpValuesInOneDbTransaction, dpsDescriptions);
 	
 	DbWriter dbWriter(
 		dpsDescriptions, 
 		make_shared<DpValuesGroupingStrategyByTablesAndPackages>(dpValuesGroupingStratagy),
-		5);
+		dbWriteThreads);
 
 	auto modelTime = QDateTime::currentDateTime();
 	while (true)
@@ -262,7 +272,7 @@ int main(void)
 		for (size_t dpIdx = 0; dpIdx < dpsDescriptions.size(); dpIdx++)
 		{
 			auto ts = modelTime;
-			for (size_t valueIdx = 0; valueIdx < demoValuesPerOneDp; valueIdx++)
+			for (size_t valueIdx = 0; valueIdx < dpValuesForOneDp; valueIdx++)
 			{
 				values.push_back(
 					DpValue(dpsDescriptions[dpIdx].Address,
@@ -272,12 +282,12 @@ int main(void)
 				ts = ts.addMSecs(1);
 			}
 		}
-		modelTime = modelTime.addMSecs(demoValuesPerOneDp + 1);
+		modelTime = modelTime.addMSecs(dpValuesForOneDp + 1);
 
 		auto startTime = QDateTime::currentDateTime();
 		dbWriter.Write(values);
 		auto durationMs = startTime.msecsTo(QDateTime::currentDateTime());
-		cout << (1000 * demoDpCounts * demoValuesPerOneDp) / durationMs << " param per sec" << endl;
+		cout << (1000 * dpCounts * dpValuesForOneDp) / durationMs << " param per sec" << endl;
 	}
 	system("pause");
 
