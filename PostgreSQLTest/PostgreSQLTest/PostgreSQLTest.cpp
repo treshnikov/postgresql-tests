@@ -30,13 +30,11 @@ class DpDescription
 public:
 	QString Address;
 	QString ArchiveName;
-	QString ValueColumnName;
-	QString StatusColumnName;
 
 	DpDescription() {}
 
-	DpDescription(const QString& address, const QString& archiveName, const QString& valueColumnName, const QString& statusColumnName)
-		:Address(address), ArchiveName(archiveName), ValueColumnName(valueColumnName), StatusColumnName(statusColumnName)
+	DpDescription(const QString& address, const QString& archiveName)
+		:Address(address), ArchiveName(archiveName)
 	{
 	}
 
@@ -102,31 +100,6 @@ private:
 		return _db.open();
 	}
 
-	void PopulateTimestamps(const std::vector<DpValue>& dpValues, QSqlQuery& query)
-	{
-		QString sql;
-		vector<QDateTime> dts;
-		for (size_t i = 0; i < dpValues.size(); i++)
-		{
-			if (find(dts.begin(), dts.end(), dpValues[i].Timestamp) == dts.end())
-			{
-				dts.push_back(dpValues[i].Timestamp);
-			}
-		}
-		_db.transaction();
-		for (size_t i = 0; i < dts.size(); i++)
-		{
-			sql = "INSERT INTO \"values\" (\"Timestamp\") VALUES (:ts) ON CONFLICT DO NOTHING";
-			query.bindValue(":ts", dts[i]);
-			auto insertResult = query.exec();
-			if (!insertResult)
-			{
-				auto lastError = query.lastError().text();
-			}
-		}
-		_db.commit();
-	}
-
 public:
 	DbWriter(const vector<DpDescription>& dpDescription,
 		const shared_ptr<DpValuesGroupingStrategyBase>& dpGrouppingStratagy)
@@ -166,12 +139,9 @@ public:
 				auto dpValue = groupedValues[groupIdx][dpIdx];
 				auto dpDesc = _datapointDescriptionMap[dpValue.Address];
 
-				sql = "INSERT INTO \"" + dpDesc.ArchiveName + "\" (\"timestamp\", \"" + dpDesc.ValueColumnName + "\", \"" + dpDesc.StatusColumnName + "\") " +
-					+" VALUES (:ts, :value, :status) ON CONFLICT (\"timestamp\") DO UPDATE SET \"" + dpDesc.ValueColumnName + "\" = :value, \"" + dpDesc.StatusColumnName + "\" = :status";
-
-				//sql = "UPDATE \"" + dpDesc.ArchiveName + "\" SET \"" + dpDesc.ValueColumnName + "\" = :value, " +
-				//	"\"" + dpDesc.StatusColumnName + "\" = :status " +
-				//	"WHERE \"Timestamp\" = :ts";
+				sql = "INSERT INTO \"" + dpDesc.ArchiveName + "\" (\"timestamp\", \"p_01\", \"s_01\") " +
+					+" VALUES (:ts, :value, :status)";
+				//ON CONFLICT (\"timestamp\") DO UPDATE SET \"p_01\" = :value, \"s_01\" = :status
 
 				insertQuery.prepare(sql);
 				insertQuery.bindValue(":ts", dpValue.Timestamp);
@@ -200,9 +170,7 @@ vector<DpDescription> PopulateDemoDpDescriptions(int dpCount)
 	{
 		dps.push_back(DpDescription(
 			"System1.temperature_" + QString::number(i).rightJustified(2, '0'),
-			QString("z_arc%1").arg(i),
-			"p_" + QString::number(1).rightJustified(2, '0'),
-			"s_" + QString::number(1).rightJustified(2, '0')));
+			QString("z_arc%1").arg(i)));
 	}
 
 	return dps;
@@ -210,8 +178,8 @@ vector<DpDescription> PopulateDemoDpDescriptions(int dpCount)
 
 int main(void)
 {
-	int demoDpCounts = 1000;
-	int demoValuesPerOneDp = 10;
+	int demoDpCounts = 100;
+	int demoValuesPerOneDp = 100;
 	
 	DpValuesGroupingStrategyByValuesNumber dpValuesGroupingStratagy(demoValuesPerOneDp);
 	
