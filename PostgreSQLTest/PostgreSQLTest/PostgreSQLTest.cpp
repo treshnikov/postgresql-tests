@@ -8,6 +8,7 @@
 #include <QtSql/qsql.h>
 #include <QtSql/qsqlquery.h>
 #include <QtSql/qsqlerror.h>
+#include <thread>
 
 using namespace std;
 
@@ -121,18 +122,44 @@ class DbWriter
 private:
 	map<QString, DpDescription> _datapointDescriptionMap;
 	shared_ptr<DpValuesGroupingStrategyBase> _dpGrouppingStratagy;
-	QSqlDatabase _db = QSqlDatabase::addDatabase("QPSQL");
+	//QSqlDatabase _db = QSqlDatabase::addDatabase("QPSQL");
+	vector<thread> threadPool;
+	vector<QSqlDatabase> dbPool;
 
-	bool TryConnectToDb()
+	//bool TryConnectToDb()
+	//{
+	//	//todo pass params via config or arguments
+	//	_db.setHostName("localhost");
+	//	_db.setDatabaseName("winccoa");
+	//	_db.setUserName("postgres");
+	//	_db.setPassword("postgres");
+	//	
+	//	//todo define connection restore logic in case of loss of connection
+	//	return _db.open();
+	//}
+
+	QSqlDatabase& AccuireConnection(int connectionIdx)
 	{
-		//todo pass params via config or arguments
-		_db.setHostName("localhost");
-		_db.setDatabaseName("winccoa");
-		_db.setUserName("postgres");
-		_db.setPassword("postgres");
-		
-		//todo define connection restore logic in case of loss of connection
-		return _db.open();
+		if (dbPool.size() <= connectionIdx)
+		{
+			//std::hash<std::thread::id> hasher;
+			//auto connectionName = QString::number(hasher(this_thread::get_id()));
+
+			QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL", QString::number(connectionIdx));
+			db.setHostName("localhost");
+			db.setDatabaseName("winccoa");
+			db.setUserName("postgres");
+			db.setPassword("postgres");
+			auto connected = db.open();
+
+			if (!connected)
+			{
+			}
+
+			dbPool.push_back(db);
+		}
+
+		return dbPool[connectionIdx];
 	}
 
 public:
@@ -148,51 +175,57 @@ public:
 		}
 	};
 
+	void WritePackage(DpValuesPackage& group, int connectionNumber)
+	{
+		QSqlDatabase& db = AccuireConnection(connectionNumber);
+		QString sql;
+		QSqlQuery query(db);
+
+		QVariantList tss;
+		QVariantList values;
+		QVariantList statuses;
+
+		db.transaction();
+		for (size_t dpIdx = 0; dpIdx < group.Values.size(); dpIdx++)
+		{
+			DpValue& dpValue = group.Values[dpIdx];
+			tss.push_back(dpValue.Timestamp);
+			values.push_back(dpValue.Value);
+			statuses.push_back(dpValue.Status);
+		}
+
+		sql = "INSERT INTO \"" + group.ArchiveTableName + "\" (\"timestamp\", \"p_01\", \"s_01\") VALUES (?, ?, ?)"; 			//ON CONFLICT (\"timestamp\") DO UPDATE SET \"p_01\" = :value, \"s_01\" = :status
+		query.prepare(sql);
+		query.addBindValue(tss);
+		query.addBindValue(values);
+		query.addBindValue(statuses);
+
+		auto insertResult = query.execBatch();
+		if (!insertResult)
+		{
+			auto lastError = query.lastError().text();
+		}
+
+		db.commit();
+		//db.close();
+		//QSqlDatabase::removeDatabase(QString::number(connectionNumber));
+	}
+
 	void Write(const vector<DpValue>& dpValues)
 	{
-		if (!TryConnectToDb())
-		{
-			//todo
-			throw - 1;
-		}
-
 		auto groupedValues = _dpGrouppingStratagy->Group(dpValues);
 
-		QString sql;
-		QSqlQuery query;
-
-		// todo perform each group in a separate thread
 		for (size_t groupIdx = 0; groupIdx < groupedValues.size(); groupIdx++)
 		{
-			DpValuesPackage& group = groupedValues[groupIdx];
-
-			QVariantList tss;
-			QVariantList values;
-			QVariantList statuses;
-
-			_db.transaction();
-			for (size_t dpIdx = 0; dpIdx < group.Values.size(); dpIdx++)
-			{
-				DpValue& dpValue = group.Values[dpIdx];
-				tss.push_back(dpValue.Timestamp);
-				values.push_back(dpValue.Value);
-				statuses.push_back(dpValue.Status);
-			}
-
-			sql = "INSERT INTO \"" + group.ArchiveTableName + "\" (\"timestamp\", \"p_01\", \"s_01\") VALUES (?, ?, ?)"; 			//ON CONFLICT (\"timestamp\") DO UPDATE SET \"p_01\" = :value, \"s_01\" = :status
-			query.prepare(sql);
-			query.addBindValue(tss);
-			query.addBindValue(values);
-			query.addBindValue(statuses);
-
-			auto insertResult = query.execBatch();
-			if (!insertResult)
-			{
-				auto lastError = query.lastError().text();
-			}
-
-			_db.commit();
+			WritePackage(groupedValues[groupIdx], groupIdx);
+			//threadPool.push_back(thread());
 		}
+
+		for (auto& th : threadPool)
+		{
+			//th.join();
+		}
+
 	};
 };
 
@@ -211,14 +244,16 @@ vector<DpDescription> PopulateDemoDpDescriptions(int dpCount)
 
 int main(void)
 {
-	int demoDpCounts = 100;
-	int demoValuesPerOneDp = 500;
+	int demoDpCounts = 4;
+	int demoValuesPerOneDp = 100;
 	auto dpsDescriptions = PopulateDemoDpDescriptions(demoDpCounts);
 
 	DpValuesGroupingStrategyByTablesAndPackages dpValuesGroupingStratagy(demoValuesPerOneDp, dpsDescriptions);
 	
-	DbWriter dbWriter(dpsDescriptions, 
-					  make_shared<DpValuesGroupingStrategyByTablesAndPackages>(dpValuesGroupingStratagy));
+	DbWriter dbWriter(
+		dpsDescriptions, 
+		make_shared<DpValuesGroupingStrategyByTablesAndPackages>(dpValuesGroupingStratagy));
+
 	while (true)
 	{
 		// generate demo dp values
