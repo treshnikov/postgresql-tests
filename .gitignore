@@ -1,3 +1,16 @@
+*.tlog
+*.ilk
+*.pdb
+*.suo
+*.db
+*.opendb
+*.ipch
+*.vcxproj
+*.vcxproj.filters
+*.log
+*.idb
+*.user
+
 # Prerequisites
 *.d
 
