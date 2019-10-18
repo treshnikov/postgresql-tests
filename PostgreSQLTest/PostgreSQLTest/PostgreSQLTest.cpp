@@ -140,12 +140,15 @@ private:
 
 	QSqlDatabase& AccuireConnection(int connectionIdx)
 	{
-		if (dbPool.size() <= connectionIdx)
+		auto maxConnections = 5;
+		auto connectionNumber = connectionIdx % maxConnections;
+
+		if (dbPool.size() <= connectionNumber)
 		{
 			//std::hash<std::thread::id> hasher;
 			//auto connectionName = QString::number(hasher(this_thread::get_id()));
 
-			QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL", QString::number(connectionIdx));
+			QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL", QString::number(connectionNumber));
 			db.setHostName("localhost");
 			db.setDatabaseName("winccoa");
 			db.setUserName("postgres");
@@ -159,7 +162,7 @@ private:
 			dbPool.push_back(db);
 		}
 
-		return dbPool[connectionIdx];
+		return dbPool[connectionNumber];
 	}
 
 public:
@@ -221,10 +224,10 @@ public:
 			//threadPool.push_back(thread());
 		}
 
-		for (auto& th : threadPool)
-		{
-			//th.join();
-		}
+		//for (auto& th : threadPool)
+		//{
+		//	//th.join();
+		//}
 
 	};
 };
@@ -244,7 +247,7 @@ vector<DpDescription> PopulateDemoDpDescriptions(int dpCount)
 
 int main(void)
 {
-	int demoDpCounts = 4;
+	int demoDpCounts = 100;
 	int demoValuesPerOneDp = 100;
 	auto dpsDescriptions = PopulateDemoDpDescriptions(demoDpCounts);
 
