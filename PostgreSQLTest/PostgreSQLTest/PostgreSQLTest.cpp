@@ -56,7 +56,8 @@ public:
 
 	QString GetArchiveTableName(const QDateTime& timestamp)
 	{
-		return "values";
+		// todo define the logic that returns the name of the table depending on the given timestamp
+		return ArchiveName;
 	}
 };
 
@@ -148,6 +149,7 @@ private:
 
 			if (!connected)
 			{
+				// todo
 			}
 
 			dbPool.push_back(db);
@@ -179,7 +181,7 @@ public:
 		QVariantList values;
 		QVariantList statuses;
 
-		db.transaction();
+		//db.transaction();
 		for (size_t dpIdx = 0; dpIdx < group.Values.size(); dpIdx++)
 		{
 			DpValue& dpValue = group.Values[dpIdx];
@@ -197,12 +199,11 @@ public:
 		auto insertResult = query.execBatch();
 		if (!insertResult)
 		{
+			// todo
 			auto lastError = query.lastError().text();
 		}
 
-		db.commit();
-		//db.close();
-		//QSqlDatabase::removeDatabase(QString::number(connectionNumber));
+		//db.commit();
 	}
 
 	void Write(const vector<DpValue>& dpValues)
@@ -249,6 +250,7 @@ vector<DpDescription> PopulateDemoDpDescriptions(int dpCount)
 
 	return dps;
 }
+
 
 vector<DpValue>  GenerateDemoDpValues(vector<DpDescription>& dpsDescriptions, QDateTime& modelTime, int dpValuesForOneDp)
 {
