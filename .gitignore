@@ -5,7 +5,6 @@
 *.db
 *.opendb
 *.ipch
-*.vcxproj
 *.vcxproj.filters
 *.log
 *.idb
