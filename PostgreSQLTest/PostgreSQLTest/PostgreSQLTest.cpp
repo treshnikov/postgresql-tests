@@ -1,4 +1,4 @@
-#include <iostream>
+﻿#include <iostream>
 #include <string>
 
 #include <QtCore/qdatetime.h>
@@ -250,44 +250,55 @@ vector<DpDescription> PopulateDemoDpDescriptions(int dpCount)
 	return dps;
 }
 
+vector<DpValue>  GenerateDemoDpValues(vector<DpDescription>& dpsDescriptions, QDateTime& modelTime, int dpValuesForOneDp)
+{
+	vector<DpValue> values;
+	for (size_t dpIdx = 0; dpIdx < dpsDescriptions.size(); dpIdx++)
+	{
+		auto ts = modelTime;
+		for (size_t valueIdx = 0; valueIdx < dpValuesForOneDp; valueIdx++)
+		{
+			values.push_back(
+				DpValue(dpsDescriptions[dpIdx].Address,
+					ts,
+					QRandomGenerator::global()->generate(),
+					QRandomGenerator::global()->generate()));
+			ts = ts.addMSecs(1);
+		}
+	}
+	return values;
+}
+
 int main(void)
 {
-	int dpCounts = 20;
-	int dpValuesForOneDp = 1000;
-	int dpValuesInOneDbTransaction = 1000;
-	int dbWriteThreads = 7;
+	// the number of datapoints to emulate, the values of each datapoint are stored in a separate table - z_arcXXX : [Timestamp, P_01, S_01]
+	int dpCounts = 10;
+
+	// the number of data point values ​​to generate per iteration for each datapoint 
+	int dpValuesForOneDp = 2000;
+
+	// package size for bulk insert
+	int dpValuesInOneDbTransaction = 2000;
+	
+	// count of threads for writing datapoint values into DB
+	int dbWriteThreadsCount = 6;
 
 	auto dpsDescriptions = PopulateDemoDpDescriptions(dpCounts);
 	DpValuesGroupingStrategyByTablesAndPackages dpValuesGroupingStratagy(dpValuesInOneDbTransaction, dpsDescriptions);
-	
 	DbWriter dbWriter(
 		dpsDescriptions, 
 		make_shared<DpValuesGroupingStrategyByTablesAndPackages>(dpValuesGroupingStratagy),
-		dbWriteThreads);
+		dbWriteThreadsCount);
 
 	auto modelTime = QDateTime::currentDateTime();
 	while (true)
 	{
-		vector<DpValue> values;
-		for (size_t dpIdx = 0; dpIdx < dpsDescriptions.size(); dpIdx++)
-		{
-			auto ts = modelTime;
-			for (size_t valueIdx = 0; valueIdx < dpValuesForOneDp; valueIdx++)
-			{
-				values.push_back(
-					DpValue(dpsDescriptions[dpIdx].Address,
-						ts,
-						QRandomGenerator::global()->generate(),
-						QRandomGenerator::global()->generate()));
-				ts = ts.addMSecs(1);
-			}
-		}
+		auto values = GenerateDemoDpValues(dpsDescriptions, modelTime, dpValuesForOneDp);
 		modelTime = modelTime.addMSecs(dpValuesForOneDp + 1);
 
 		auto startTime = QDateTime::currentDateTime();
 		dbWriter.Write(values);
-		auto durationMs = startTime.msecsTo(QDateTime::currentDateTime());
-		cout << (1000 * dpCounts * dpValuesForOneDp) / durationMs << " param per sec" << endl;
+		cout << 1000 * dpCounts * dpValuesForOneDp / startTime.msecsTo(QDateTime::currentDateTime()) << " param per sec" << endl;
 	}
 	system("pause");
 
