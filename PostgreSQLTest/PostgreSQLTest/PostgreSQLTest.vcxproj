@@ -154,7 +154,21 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="PostgreSQLTest.cpp" />
+    <ClCompile Include="DbWriter.cpp" />
+    <ClCompile Include="DpDescription.cpp" />
+    <ClCompile Include="DpValue.cpp" />
+    <ClCompile Include="DpValuesGroupingStrategyBase.cpp" />
+    <ClCompile Include="DpValuesGroupingStrategyByTablesAndPackages.cpp" />
+    <ClCompile Include="DpValuesPackage.cpp" />
+    <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="DbWriter.h" />
+    <ClInclude Include="DpDescription.h" />
+    <ClInclude Include="DpValue.h" />
+    <ClInclude Include="DpValuesGroupingStrategyBase.h" />
+    <ClInclude Include="DpValuesGroupingStrategyByTablesAndPackages.h" />
+    <ClInclude Include="DpValuesPackage.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
