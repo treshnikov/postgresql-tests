@@ -7,7 +7,7 @@ DpValuesGroupingStrategyByTablesAndPackages::DpValuesGroupingStrategyByTablesAnd
 {
 	for (size_t i = 0; i < dpDescription.size(); i++)
 	{
-		dpAddressToDpDescription.insert(
+		_dpAddressToDpDescription.insert(
 			std::make_pair(dpDescription[i].Address,
 			               dpDescription[i]));
 	}
@@ -20,7 +20,7 @@ std::vector<DpValuesPackage> DpValuesGroupingStrategyByTablesAndPackages::Group(
 	// group dpValues by archive table name
 	for (const auto& arg : args)
 	{
-		auto tableName = dpAddressToDpDescription[arg.Address].ArchiveName;
+		auto tableName = _dpAddressToDpDescription[arg.Address].ArchiveName;
 		if (arcTableNameToDpValues.find(tableName) == arcTableNameToDpValues.end())
 		{
 			arcTableNameToDpValues[tableName] = std::vector<DpValue>();

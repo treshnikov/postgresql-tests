@@ -6,6 +6,7 @@
 #include "DpValue.h"
 #include "DpValuesGroupingStrategyByTablesAndPackages.h"
 #include "DbWriter.h"
+#include <iostream>
 
 
 std::vector<DpDescription> PopulateDemoDpDescriptions(int dpCount)

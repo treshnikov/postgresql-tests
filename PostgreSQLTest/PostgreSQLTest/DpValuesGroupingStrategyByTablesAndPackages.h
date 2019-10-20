@@ -8,7 +8,7 @@ class DpValuesGroupingStrategyByTablesAndPackages : public DpValuesGroupingStrat
 {
 private:
 	int _packageSize;
-	std::map<QString, DpDescription> dpAddressToDpDescription;
+	std::map<QString, DpDescription> _dpAddressToDpDescription;
 public:
 	DpValuesGroupingStrategyByTablesAndPackages(int packageSize, const std::vector<DpDescription>& dpDescription);
 
