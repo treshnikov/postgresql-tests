@@ -90,15 +90,15 @@ public:
 		map<QString, vector<DpValue>> arcTableNameToDpValues;
 
 		// group dpValues by archive table name
-		for (size_t i = 0; i < args.size(); i++)
+		for (const auto& arg : args)
 		{
-			auto tableName = dpAddressToDpDescription[args[i].Address].ArchiveName;
+			auto tableName = dpAddressToDpDescription[arg.Address].ArchiveName;
 			if (arcTableNameToDpValues.find(tableName) == arcTableNameToDpValues.end())
 			{
 				arcTableNameToDpValues[tableName] = vector<DpValue>();
 			}
 
-			arcTableNameToDpValues[tableName].push_back(args[i]);
+			arcTableNameToDpValues[tableName].push_back(arg);
 		}
 
 		vector<DpValuesPackage> result;
@@ -160,7 +160,7 @@ private:
 public:
 	DbWriter(const vector<DpDescription>& dpDescription,
 		const shared_ptr<DpValuesGroupingStrategyBase>& dpGrouppingStratagy,
-		int threadsCount)
+		const int threadsCount)
 		: _dpGrouppingStratagy(dpGrouppingStratagy), _threadsCount(threadsCount)
 	{
 		for (size_t i = 0; i < dpDescription.size(); i++)
@@ -184,23 +184,21 @@ public:
 		QStringList statuses;
 
 		//db.transaction();
-		for (size_t dpIdx = 0; dpIdx < group.Values.size(); dpIdx++)
+		for (auto& dpValue : group.Values)
 		{
-			DpValue& dpValue = group.Values[dpIdx];
 			tss << "TIMESTAMP '" + dpValue.Timestamp.toString("dd.MM.yyyy hh:mm:ss.zzz") + "'";
 			values << QString::number(dpValue.Value);
 			statuses << QString::number(dpValue.Status);
 		}
 
-		sql = QString("INSERT INTO \"" + group.ArchiveTableName + "\" (\"timestamp\", \"p_01\", \"s_01\") SELECT unnest(array[%1]), unnest(array[%2]), unnest(array[%3])")
+		sql = QString(
+				"INSERT INTO \"" + group.ArchiveTableName +
+				"\" (\"timestamp\", \"p_01\", \"s_01\") SELECT unnest(array[%1]), unnest(array[%2]), unnest(array[%3])")
 			.arg(tss.join(", "), values.join(", "), statuses.join(", "));
 
 		query.prepare(sql);
-		//query.bindValue(":ts", tss);
-		//query.bindValue(":val", values);
-		//query.bindValue(":stat", statuses);
 
-		auto insertResult = query.exec();
+		const auto insertResult = query.exec();
 		if (!insertResult)
 		{
 			// todo
@@ -217,10 +215,10 @@ public:
 
 		for (size_t groupIdx = 0; groupIdx < groupedValues.size(); groupIdx++)
 		{
-			DpValuesPackage& group = groupedValues[groupIdx];
+			auto& group = groupedValues[groupIdx];
 			
 			int poolIdx = groupIdx % _threadsCount;
-			QSqlDatabase& db = dbPool[poolIdx];
+			auto& db = dbPool[poolIdx];
 			
 			threadPool.push_back(thread(&DbWriter::WritePackage, this, ref(group), ref(db)));
 
@@ -259,13 +257,13 @@ vector<DpDescription> PopulateDemoDpDescriptions(int dpCount)
 vector<DpValue>  GenerateDemoDpValues(vector<DpDescription>& dpsDescriptions, QDateTime& modelTime, int dpValuesForOneDp)
 {
 	vector<DpValue> values;
-	for (size_t dpIdx = 0; dpIdx < dpsDescriptions.size(); dpIdx++)
+	for (auto& dpsDescription : dpsDescriptions)
 	{
 		auto ts = modelTime;
 		for (size_t valueIdx = 0; valueIdx < dpValuesForOneDp; valueIdx++)
 		{
 			values.push_back(
-				DpValue(dpsDescriptions[dpIdx].Address,
+				DpValue(dpsDescription.Address,
 					ts,
 					QRandomGenerator::global()->generate(),
 					QRandomGenerator::global()->generate()));
@@ -278,16 +276,16 @@ vector<DpValue>  GenerateDemoDpValues(vector<DpDescription>& dpsDescriptions, QD
 int main(void)
 {
 	// the number of datapoints to emulate, the values of each datapoint are stored in a separate table - z_arcXXX : [Timestamp, P_01, S_01]
-	int dpCounts = 50;
+	const auto dpCounts = 50;
 
 	// the number of data point values ​​to generate per iteration for each datapoint 
-	int dpValuesForOneDp = 1000;
+	const auto dpValuesForOneDp = 1000;
 
 	// package size for bulk insert
-	int dpValuesInOneDbTransaction = 1000;
+	const auto dpValuesInOneDbTransaction = 1000;
 	
 	// count of threads for writing datapoint values into DB
-	int dbWriteThreadsCount = 5;
+	const auto dbWriteThreadsCount = 5;
 
 	auto dpsDescriptions = PopulateDemoDpDescriptions(dpCounts);
 	DpValuesGroupingStrategyByTablesAndPackages dpValuesGroupingStratagy(dpValuesInOneDbTransaction, dpsDescriptions);
