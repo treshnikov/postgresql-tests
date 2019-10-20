@@ -150,6 +150,7 @@ private:
 			if (!connected)
 			{
 				// todo
+				cout << "Cannot connect to db" << endl;
 			}
 
 			dbPool.push_back(db);
@@ -176,27 +177,30 @@ public:
 	{
 		QString sql;
 		QSqlQuery query(db);
+		const int cnt = group.Values.size();
 
-		QVariantList tss;
-		QVariantList values;
-		QVariantList statuses;
+		QStringList tss;
+		QStringList values;
+		QStringList statuses;
 
 		//db.transaction();
 		for (size_t dpIdx = 0; dpIdx < group.Values.size(); dpIdx++)
 		{
 			DpValue& dpValue = group.Values[dpIdx];
-			tss.push_back(dpValue.Timestamp);
-			values.push_back(dpValue.Value);
-			statuses.push_back(dpValue.Status);
+			tss << "TIMESTAMP '" + dpValue.Timestamp.toString("dd.MM.yyyy hh:mm:ss.zzz") + "'";
+			values << QString::number(dpValue.Value);
+			statuses << QString::number(dpValue.Status);
 		}
 
-		sql = "INSERT INTO \"" + group.ArchiveTableName + "\" (\"timestamp\", \"p_01\", \"s_01\") VALUES (?, ?, ?)"; 			//ON CONFLICT (\"timestamp\") DO UPDATE SET \"p_01\" = :value, \"s_01\" = :status
-		query.prepare(sql);
-		query.addBindValue(tss);
-		query.addBindValue(values);
-		query.addBindValue(statuses);
+		sql = QString("INSERT INTO \"" + group.ArchiveTableName + "\" (\"timestamp\", \"p_01\", \"s_01\") SELECT unnest(array[%1]), unnest(array[%2]), unnest(array[%3])")
+			.arg(tss.join(", "), values.join(", "), statuses.join(", "));
 
-		auto insertResult = query.execBatch();
+		query.prepare(sql);
+		//query.bindValue(":ts", tss);
+		//query.bindValue(":val", values);
+		//query.bindValue(":stat", statuses);
+
+		auto insertResult = query.exec();
 		if (!insertResult)
 		{
 			// todo
@@ -274,16 +278,16 @@ vector<DpValue>  GenerateDemoDpValues(vector<DpDescription>& dpsDescriptions, QD
 int main(void)
 {
 	// the number of datapoints to emulate, the values of each datapoint are stored in a separate table - z_arcXXX : [Timestamp, P_01, S_01]
-	int dpCounts = 10;
+	int dpCounts = 50;
 
 	// the number of data point values ​​to generate per iteration for each datapoint 
-	int dpValuesForOneDp = 2000;
+	int dpValuesForOneDp = 1000;
 
 	// package size for bulk insert
-	int dpValuesInOneDbTransaction = 2000;
+	int dpValuesInOneDbTransaction = 1000;
 	
 	// count of threads for writing datapoint values into DB
-	int dbWriteThreadsCount = 6;
+	int dbWriteThreadsCount = 5;
 
 	auto dpsDescriptions = PopulateDemoDpDescriptions(dpCounts);
 	DpValuesGroupingStrategyByTablesAndPackages dpValuesGroupingStratagy(dpValuesInOneDbTransaction, dpsDescriptions);
