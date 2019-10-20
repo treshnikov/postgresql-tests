@@ -5,6 +5,7 @@
 
 void DbWriter::PopulateDbConnections()
 {
+	// todo pass connection string
 	for (size_t i = 0; i < _threadsCount; i++)
 	{
 		QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL", QString::number(i));
@@ -54,6 +55,7 @@ void DbWriter::WritePackage(DpValuesPackage& group, QSqlDatabase& db)
 		statuses << QString::number(dpValue.Status);
 	}
 
+	// todo pass values by array variables
 	sql = QString(
 			"INSERT INTO \"" + group.ArchiveTableName +
 			"\" (\"timestamp\", \"p_01\", \"s_01\") SELECT unnest(array[%1]), unnest(array[%2]), unnest(array[%3])")
