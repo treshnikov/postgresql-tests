@@ -6,7 +6,7 @@ BEGIN
 					timestamp timestamp without time zone NOT NULL,
 					p_01 double precision,
 					s_01 numeric(22,0),
-					primary key (Timestamp)
+					primary key (timestamp)
 				)';
 
 	   RAISE NOTICE 'Counter: %', counter;
