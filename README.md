@@ -8,3 +8,4 @@ The main scenario:
 * The size of the chunk can also be set up.
 * Each database table has the following columns - timestamp(for date and time) , p_01(for datapoint value), s_01(for datapoint status).
 * The UNNEST plsql function is used to make fast bulk inserts.
+![](https://github.com/treshnikov/postgresql-tests/blob/master/img/console.png)
