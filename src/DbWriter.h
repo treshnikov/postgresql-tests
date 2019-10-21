@@ -5,10 +5,12 @@
 #include "DpValuesGroupingStrategyBase.h"
 #include <QtSql/qsqldatabase.h>
 #include <thread>
+#include "DbProfile.h"
 
 class DbWriter
 {
 private:
+	DbProfile _dbProfile;
 	int _threadsCount;
 	std::map<QString, DpDescription> _datapointDescriptionMap;
 	std::shared_ptr<DpValuesGroupingStrategyBase> _dpGrouppingStratagy;
@@ -17,9 +19,10 @@ private:
 	void PopulateDbConnections();
 
 public:
-	DbWriter(const std::vector<DpDescription>& dpDescription,
+	DbWriter(const DbProfile& dbProfile,
+			 const std::vector<DpDescription>& dpDescription,
 	         const std::shared_ptr<DpValuesGroupingStrategyBase>& dpGrouppingStratagy,
-	         const int threadsCount);;
+	         const int threadsCount);
 
 	void WritePackage(DpValuesPackage& group, QSqlDatabase& db);
 

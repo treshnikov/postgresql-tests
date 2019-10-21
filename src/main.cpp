@@ -59,6 +59,7 @@ int main(void)
 	auto dpsDescriptions = PopulateDemoDpDescriptions(dpCounts);
 	DpValuesGroupingStrategyByTablesAndPackages dpValuesGroupingStratagy(dpValuesInOneDbTransaction, dpsDescriptions);
 	DbWriter dbWriter(
+		DbProfile("localhost", "winccoa", "postgres", "postgres"),
 		dpsDescriptions,
 		std::make_shared<DpValuesGroupingStrategyByTablesAndPackages>(dpValuesGroupingStratagy),
 		dbWriteThreadsCount);

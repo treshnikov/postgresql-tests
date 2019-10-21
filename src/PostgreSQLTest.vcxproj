@@ -154,6 +154,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="DbProfile.cpp" />
     <ClCompile Include="DbWriter.cpp" />
     <ClCompile Include="DpDescription.cpp" />
     <ClCompile Include="DpValue.cpp" />
@@ -163,6 +164,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DbProfile.h" />
     <ClInclude Include="DbWriter.h" />
     <ClInclude Include="DpDescription.h" />
     <ClInclude Include="DpValue.h" />

@@ -5,14 +5,13 @@
 
 void DbWriter::PopulateDbConnections()
 {
-	// todo pass connection string
 	for (size_t i = 0; i < _threadsCount; i++)
 	{
 		QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL", QString::number(i));
-		db.setHostName("localhost");
-		db.setDatabaseName("winccoa");
-		db.setUserName("postgres");
-		db.setPassword("postgres");
+		db.setHostName(_dbProfile.HostName);
+		db.setDatabaseName(_dbProfile.DatabaseName);
+		db.setUserName(_dbProfile.UserName);
+		db.setPassword(_dbProfile.Password);
 		auto connected = db.open();
 
 		if (!connected)
@@ -25,9 +24,10 @@ void DbWriter::PopulateDbConnections()
 	}
 }
 
-DbWriter::DbWriter(const std::vector<DpDescription>& dpDescription,
+DbWriter::DbWriter(const DbProfile& dbProfile,
+				   const std::vector<DpDescription>& dpDescription,
                    const std::shared_ptr<DpValuesGroupingStrategyBase>& dpGrouppingStratagy, const int threadsCount):
-	_dpGrouppingStratagy(dpGrouppingStratagy), _threadsCount(threadsCount)
+	_dpGrouppingStratagy(dpGrouppingStratagy), _threadsCount(threadsCount), _dbProfile(dbProfile)
 {
 	for (const auto& i : dpDescription)
 	{
