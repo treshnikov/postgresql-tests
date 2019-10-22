@@ -14,9 +14,9 @@ std::vector<DpDescription> PopulateDemoDpDescriptions(int dpCount)
 	std::vector<DpDescription> dps;
 	for (size_t i = 1; i <= dpCount; i++)
 	{
-		dps.push_back(DpDescription(
+		dps.emplace_back(
 			"System1.temperature_" + QString::number(i).rightJustified(2, '0'),
-			QString("z_arc%1").arg(i)));
+			QString("z_arc%1").arg(i));
 	}
 
 	return dps;
@@ -31,11 +31,10 @@ std::vector<DpValue>  GenerateDemoDpValues(std::vector<DpDescription>& dpsDescri
 		auto ts = modelTime;
 		for (size_t valueIdx = 0; valueIdx < dpValuesForOneDp; valueIdx++)
 		{
-			values.push_back(
-				DpValue(dpsDescription.Address,
+			values.emplace_back(dpsDescription.Address,
 					ts,
-					QRandomGenerator::global()->generate(),
-					QRandomGenerator::global()->generate()));
+					QRandomGenerator::global()->generateDouble(),
+					QRandomGenerator::global()->generateDouble());
 			ts = ts.addMSecs(1);
 		}
 	}
