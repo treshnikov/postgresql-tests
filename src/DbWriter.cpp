@@ -20,6 +20,8 @@ void DbWriter::PopulateDbConnections()
 			std::cout << "Cannot connect to db" << std::endl;
 		}
 
+		// todo restore connection in case of loss
+
 		_dbPool.push_back(db);
 	}
 }
@@ -89,14 +91,14 @@ void DbWriter::Write(const std::vector<DpValue>& dpValues)
 
 		if (poolIdx == _threadsCount - 1)
 		{
-			for (auto& th : threadPool)
-			{
-				th.join();
-			}
-			threadPool.clear();
+			WaitForAllWriteThreads(threadPool);
 		}
 	}
+	WaitForAllWriteThreads(threadPool);
+}
 
+void DbWriter::WaitForAllWriteThreads(std::vector<std::thread>& threadPool)
+{
 	for (auto& th : threadPool)
 	{
 		th.join();

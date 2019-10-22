@@ -18,6 +18,8 @@ private:
 
 	void PopulateDbConnections();
 
+	void WaitForAllWriteThreads(std::vector<std::thread>& threadPool);
+
 public:
 	DbWriter(const DbProfile& dbProfile,
 			 const std::vector<DpDescription>& dpDescription,
