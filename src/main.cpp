@@ -64,6 +64,8 @@ int main(void)
 		dbWriteThreadsCount);
 
 	auto modelTime = QDateTime::currentDateTime();
+	const auto measuresCountToCalculateAverageSpeed = 30;
+	std::vector<int> speedMeasurements;
 	while (true)
 	{
 		auto values = GenerateDemoDpValues(dpsDescriptions, modelTime, dpValuesForOneDp);
@@ -71,7 +73,14 @@ int main(void)
 
 		auto startTime = QDateTime::currentDateTime();
 		dbWriter.Write(values);
-		std::cout << 1000 * dpCounts * dpValuesForOneDp / startTime.msecsTo(QDateTime::currentDateTime()) << " param per sec" << std::endl;
+		auto currentSpeed = 1000 * dpCounts * dpValuesForOneDp / startTime.msecsTo(QDateTime::currentDateTime());
+
+		speedMeasurements.emplace_back(currentSpeed);
+		if (speedMeasurements.size() > measuresCountToCalculateAverageSpeed)
+		{
+			speedMeasurements.erase(speedMeasurements.begin(), speedMeasurements.begin() + 1);
+		}
+		std::cout << currentSpeed << " inserts per sec, avg = " << std::accumulate(speedMeasurements.begin(), speedMeasurements.end(), 0.0) / speedMeasurements.size() << std::endl;
 	}
 	system("pause");
 
